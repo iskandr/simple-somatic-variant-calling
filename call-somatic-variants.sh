@@ -112,9 +112,20 @@ function process_alignments() {
 
 }
 
+
+function call_somatic_variants() {
+        local NORMAL_BAM=$1;
+        local TUMOR_BAM=$2;
+        echo "Generating Strelka2 configuration";
+        configureStrelkaSomaticWorkflow.py \
+                --normalBam $NORMAL_BAM \
+                --tumorBam $TUMOR_BAM \
+                --referenceFasta $REFERENCE_FASTA_PATH
+}
+
 download_and_index_reference_genome;
 align_fastq_pairs $NORMAL_FASTQ_DIR $NORMAL_SAMPLE_NAME;
 align_fastq_pairs $TUMOR_FASTQ_DIR TUMOR_SAMPLE_NAME;
 process_alignments "$NORMAL_SAMPLE_NAME.bam";
 process_alignments "$TUMOR_SAMPLE_NAME.bam";
-
+call_somatic_variants "$NORMAL_SAMPLE_NAME.final.bam" "$TUMOR_SAMPLE_NAME.final.bam";
