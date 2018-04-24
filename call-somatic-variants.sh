@@ -17,17 +17,29 @@ REFERENCE_FASTA_NAME="hs37d5.fasta"
 REFERENCE_FASTA_PATH="$REFERENCE_DIR/$REFERENCE_FASTA_NAME"
 REFERENCE_INDEX_PATH="$REFERENCE_FASTA_PATH.bwt"
 
-# normal sample
-NORMAL_FASTQ_DIR=.
-# first commandline argument is prefix for normal FASTQ files
-NORMAL_FASTQ_PREFIX=${1:-'Z10-1002'}
 NORMAL_SAMPLE_NAME="NORMAL"
-
-# tumor sample
-TUMOR_FASTQ_DIR=.
-# second commandline argument is prefix for tumor FASTQ files
-TUMOR_FASTQ_PREFIX=${2:-'Z10-1003'}
 TUMOR_SAMPLE_NAME="TUMOR"
+
+echo "Simple somatic variant calling pipeline";
+echo "=======";
+
+if [ $# -ne 4 ] ; then
+    echo "Wrong number of arguments ($#)";
+    echo "Expected arguments:";
+    echo "      (1) directory containing normal FASTQ files";
+    echo "      (2) common prefix in names of all normal FASTQ files";
+    echo "      (3) directory containing tumor FASTQ files";
+    echo "      (4) common prefix in names of all tumor FASTQ files";
+    echo "----"
+    echo "Example:";
+    echo "      ./call-somatic-variants.sh . normal . tumor";
+    exit 1;
+else
+    NORMAL_FASTQ_DIR=$1;
+    NORMAL_FASTQ_PREFIX=$2;
+    TUMOR_FASTQ_DIR=$3;
+    TUMOR_FASTQ_PREFIX=$4;
+fi
 
 echo "Quick & Dirty Somatic Variant Calling Pipeline";
 echo "---";
