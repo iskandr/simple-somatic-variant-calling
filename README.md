@@ -1,11 +1,17 @@
 # simple-dirty-somatic-variant-calling
 A simple genomics "pipeline" implemented via a single shell script.
 
-Requires:
+## Requirements
+
     * [sambamba](http://lomereiter.github.io/sambamba/)
     * [bamtools](https://github.com/pezmaster31/bamtools)
     * [Picard](https://broadinstitute.github.io/picard/)
     * [BWA](http://bio-bwa.sourceforge.net/)
     * [Strelka2](https://github.com/Illumina/strelka/)
 
+## Invocation 
+```sh
+./call-somatic-variants $PATH_TO_NORMAL $NORMAL_FASTQ_PREFIX $PATH_TO_TUMOR $TUMOR_FASTQ_PREFIX
+```
 
+Generates BAMs and VCF file in the directory it was invoked. You can edit the shell script to specify a directory with an indexed human reference, otherwise the reference gets downloaded and indexed in the same directory. 
