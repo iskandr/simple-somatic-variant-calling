@@ -1,5 +1,5 @@
 # simple-dirty-somatic-variant-calling
-A simple genomics "pipeline" implemented via a single shell script.
+A simple genomics "pipeline" implemented via a single shell script. Aligns tumor & normal DNA sequencing data, marks duplicate reads in BAM files, and runs Strelka2 as a somatic variant caller. 
 
 ## Requirements
 
