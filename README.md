@@ -3,11 +3,11 @@ A simple genomics "pipeline" implemented via a single shell script. Aligns tumor
 
 ## Requirements
 
-    * [sambamba](http://lomereiter.github.io/sambamba/)
-    * [bamtools](https://github.com/pezmaster31/bamtools)
-    * [Picard](https://broadinstitute.github.io/picard/)
-    * [BWA](http://bio-bwa.sourceforge.net/)
-    * [Strelka2](https://github.com/Illumina/strelka/)
+ * [sambamba](http://lomereiter.github.io/sambamba/)
+ * [bamtools](https://github.com/pezmaster31/bamtools)
+ * [Picard](https://broadinstitute.github.io/picard/)
+ * [BWA](http://bio-bwa.sourceforge.net/)
+ * [Strelka2](https://github.com/Illumina/strelka/)
 
 ## Invocation 
 ```sh
