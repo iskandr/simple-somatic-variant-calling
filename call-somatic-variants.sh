@@ -17,9 +17,6 @@ REFERENCE_FASTA_NAME="hs37d5.fasta"
 REFERENCE_FASTA_PATH="$REFERENCE_DIR/$REFERENCE_FASTA_NAME"
 REFERENCE_INDEX_PATH="$REFERENCE_FASTA_PATH.bwt"
 
-NORMAL_SAMPLE_NAME="NORMAL"
-TUMOR_SAMPLE_NAME="TUMOR"
-
 echo "Simple somatic variant calling pipeline";
 echo "=======";
 
@@ -47,34 +44,41 @@ echo "Normal FASTQ location: $NORMAL_FASTQ_DIR/$NORMAL_FASTQ_PREFIX*.fastq";
 echo "Tumor FASTQ location: $TUMOR_FASTQ_DIR/$TUMOR_FASTQ_PREFIX*.fastq";
 echo "---";
 
+
+function run() {
+        # print a command before running it wrapped in a 'time' command
+        local COMMAND=$1;
+        echo $COMMAND;
+        eval "time $COMMAND"
+}
+
 function download_and_index_reference_genome() {
         echo "-- download_and_index_reference_genome";
         if [ ! -e $REFERENCE_FASTA_PATH ]; then
                 echo "Couldn't find reference file $REFERENCE_FASTA_PATH";
                 echo "Downloading from $REFERENCE_FASTA_SOURCE..."
-                wget $REFERENCE_FASTA_SOURCE;
+                run "wget $REFERENCE_FASTA_SOURCE";
                 echo "Decompressing downloaded reference genome..."
-                time gunzip hs37d5.fa.gz;
-                mv hs37d5.fa $REFERENCE_FASTA_PATH;
+                run "gunzip hs37d5.fa.gz";
+                run "mv hs37d5.fa $REFERENCE_FASTA_PATH";
         else
                 echo "Using reference: $REFERENCE_FASTA_PATH"
         fi;
         if [ ! -s $REFERENCE_INDEX_PATH ]; then
                 echo "Creating index for $REFERENCE_FASTA_PATH"
-                bwa index $REFERENCE_FASTA_PATH
+                run "bwa index $REFERENCE_FASTA_PATH";
         fi;
 }
+
 
 function align_fastq_pairs() {
         # 1) Align every FASTQ pair into multiple BAM files
         # 2) Merge them into single BAM file per sample
         local FASTQ_DIR=$1;
         local FASTQ_PREFIX=$2;
-        local SAMPLE=$3;
         echo "-- align_fastq_pairs";
         echo "  FASTQ_DIR=$FASTQ_DIR";
         echo "  FASTQ_PREFIX=$FASTQ_PREFIX";
-        echo "  SAMPLE=$SAMPLE";
 
         # check to make sure that all arguments are non-empty
         if [[ -z $FASTQ_DIR ]] ; then
@@ -83,10 +87,6 @@ function align_fastq_pairs() {
         fi
         if [[ -z $FASTQ_PREFIX ]] ; then
                 echo "Missing second argument (FASTQ_PREFIX)";
-                exit 1;
-        fi
-        if [[ -z $SAMPLE ]] ; then
-                echo "Missing third argument (SAMPLE)";
                 exit 1;
         fi
 
@@ -100,24 +100,29 @@ function align_fastq_pairs() {
                 echo "R2: $R2_fastq";
                 # make a local file name for the BAM we're going to generate from each FASTQ pair
                 local READ_GROUP=`basename $R1_fastq | sed -e 's/\.R1\.fastq\.gz//g'`
+                local SAMPLE=
+                local SAM="$READ_GROUP.sam"
                 local BAM="$READ_GROUP.bam"
                 # test if $BAM exists and is non-empty
                 if [ ! -s $BAM ]; then
                         echo "Generating BAM file $BAM";
-                        local BWA_COMMAND="bwa mem -M \
+                        run "bwa mem -M \
                                 -t $NUMBER_PROCESSORS \
-                                -R '@RG\tID:$READ_GROUP\tSM:$SAMPLE\tLB:$SAMPLE\tPL:ILLUMINA' \
+                                -R '@RG\tID:$READ_GROUP\tSM:$FASTQ_PREFIX\tLB:$FASTQ_PREFIX\tPL:ILLUMINA' \
                                 $REFERENCE_FASTA_PATH \
-                                $R1_fastq $R2_fastq | samtools view -Sb - > $BAM"
-                        echo $BWA_COMMAND;
-                        eval "time $BWA_COMMAND";
+                                $R1_fastq $R2_fastq > $SAM";
+                        run "samtools view -S -b $SAM \
+                                -@ $NUMBER_PROCESSORS \
+                                -o $BAM";
+                        # once we've successfully create BAM file, clean up SAM
+                        run "rm $SAM";
                         echo "---";
                 else
                         echo "BAM file $BAM already exists";
                 fi;
         done;
-        echo "Merging all BAM files for $SAMPLE into single alignment file";
-        bamtools merge -in $FASTQ_DIR/$FASTQ_PREFIX*.bam  -out $SAMPLE.bam;
+        echo "Merging all BAM files for $FASTQ_PREFIX into single alignment file";
+        bamtools merge -in $FASTQ_DIR/$FASTQ_PREFIX*.bam  -out $FASTQ_PREFIX.bam;
 }
 
 function process_alignments() {
@@ -126,38 +131,36 @@ function process_alignments() {
         #       - index BAM
         #       - mark duplicates
         # Input: sample bam (expected to exist $SAMPLE_NAME.bam)
-        # Output: generates $SAMPLE_NAME.final.bam
+        # Output: generates SAMPLE_NAME.final.bam
 
         # sort and index BAM file
-        local SAMPLE_NAME=$1;
-        local UNSORTED_BAM="$SAMPLE_NAME.bam"
-        local SORTED_BAM="$SAMPLE_NAME.sorted.bam"
+        local UNSORTED_BAM=$1;
+        local SORTED_BAM=`echo $UNSORTED_BAM | sed -e 's/\.bam/\.sorted\.bam/g'`
         echo "-- process_alignments";
-        echo "  SAMPLE_NAME: $SAMPLE_NAME";
         echo "  UNSORTED_BAM: $UNSORTED_BAM";
         echo "  SORTED_BAM: $SORTED_BAM";
 
         echo "Sorting $BAM to generate $SORTED_BAM";
-        sambamba sort \
+        run "sambamba sort \
                 --memory-limit $MEMORY_LIMIT \
                 --show-progress \
                 --nthreads $NUMBER_PROCESSORS \
                 --out $SORTED_BAM \
-                $BAM;
+                $BAM";
         echo "Indexing sorted BAM $SORTED_BAM";
-        sambamba index \
+        run "sambamba index \
                 --nthreads $NUMBER_PROCESSORS \
                 --show-progress \
-                $BAM;
+                $BAM";
         # strip off everything after the first '.' in the file name
         local BASE_FILENAME=`basename $BAM | cut -f 1 -d '.'`;
         local FINAL_BAM="$BASE_FILENAME.final.bam";
         echo "Marking duplicates to generate $FINAL_BAM";
-        sambamba markdup \
+        run "sambamba markdup \
                 --nthreads $NUMBER_PROCESSORS \
                 --show-progress \
                 $SORTED_BAM \
-                $FINAL_BAM;
+                $FINAL_BAM";
 }
 
 
@@ -167,21 +170,20 @@ function call_somatic_variants() {
         echo "-- call_somatic_variants";
         echo "  NORMAL_BAM: $NORMAL_BAM";
         echo "  TUMOR_BAM: $TUMOR_BAM";
-
         echo "Generating Strelka2 configuration";
-        configureStrelkaSomaticWorkflow.py \
+        run "configureStrelkaSomaticWorkflow.py \
                 --normalBam $NORMAL_BAM \
                 --tumorBam $TUMOR_BAM \
                 --referenceFasta $REFERENCE_FASTA_PATH \
-                --runDir .;
+                --runDir .";
         echo "Running Strelka2";
         # execution on a single local machine with 20 parallel jobs
-        ./runWorkflow.py -m local -j $NUMBER_PROCESSORS
+        run "./runWorkflow.py -m local -j $NUMBER_PROCESSORS";
 }
 
 download_and_index_reference_genome;
-align_fastq_pairs $NORMAL_FASTQ_DIR $NORMAL_FASTQ_PREFIX $NORMAL_SAMPLE_NAME;
-align_fastq_pairs $TUMOR_FASTQ_DIR $TUMOR_FASTQ_PREFIX TUMOR_SAMPLE_NAME;
-process_alignments "$NORMAL_SAMPLE_NAME";
-process_alignments "$TUMOR_SAMPLE_NAME";
-call_somatic_variants "$NORMAL_SAMPLE_NAME.final.bam" "$TUMOR_SAMPLE_NAME.final.bam";
+align_fastq_pairs $NORMAL_FASTQ_DIR $NORMAL_FASTQ_PREFIX;
+align_fastq_pairs $TUMOR_FASTQ_DIR $TUMOR_FASTQ_PREFIX;
+process_alignments "$NORMAL_FASTQ_PREFIX.bam";
+process_alignments "$TUMOR_FASTQ_PREFIX.bam";
+call_somatic_variants "$NORMAL_FASTQ_PREFIX.final.bam" "$TUMOR_FASTQ_PREFIX.final.bam";
