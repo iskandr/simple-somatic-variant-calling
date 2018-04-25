@@ -91,7 +91,7 @@ function align_fastq_pairs() {
         fi
 
         for R1_fastq in $FASTQ_DIR/$FASTQ_PREFIX*.R1.fastq.gz ; do
-                R2_fastq=`echo $R1_fastq | sed -e 's/.R1/.R2/g'`
+                R2_fastq=`echo $R1_fastq | sed -e 's/\.R1\./\.R2\./g'`
                 if [ ! -e $R2_fastq ]; then
                         echo "Couldn't find R2 ($R2_fastq) corresponding to $R1_fastq"
                         exit 1;
@@ -99,7 +99,7 @@ function align_fastq_pairs() {
                 echo "R1: $R1_fastq";
                 echo "R2: $R2_fastq";
                 # make a local file name for the BAM we're going to generate from each FASTQ pair
-                local READ_GROUP=`basename $R1_fastq | sed -e 's/.R1.fastq.gz//g'
+                local READ_GROUP=`basename $R1_fastq | sed -e 's/\.R1\.fastq\.gz//g'
                 local BAM="$READ_GROUP.bam"
                 # test if $BAM exists and is non-empty
                 if [ ! -s $BAM ]; then
