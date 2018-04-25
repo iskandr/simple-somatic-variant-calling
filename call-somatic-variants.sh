@@ -75,6 +75,21 @@ function align_fastq_pairs() {
         echo "  FASTQ_DIR=$FASTQ_DIR";
         echo "  FASTQ_PREFIX=$FASTQ_PREFIX";
         echo "  SAMPLE=$SAMPLE";
+
+        # check to make sure that all arguments are non-empty
+        if [[ -z $FASTQ_DIR ]] ; then
+                echo "Missing first argument (FASTQ_DIR)";
+                exit 1;
+        fi
+        if [[ -z $FASTQ_PREFIX ]] ; then
+                echo "Missing second argument (FASTQ_PREFIX)";
+                exit 1;
+        fi
+        if [[ -z $SAMPLE ]] ; then
+                echo "Missing third argument (SAMPLE)";
+                exit 1;
+        fi
+
         for R1_fastq in $FASTQ_DIR/$FASTQ_PREFIX*_R1*.gz ; do
                 R2_fastq=`echo $R1_fastq | sed -e 's/_R1/_R2/g'`
                 if [ ! -e $R2_fastq ]; then
@@ -117,6 +132,10 @@ function process_alignments() {
         local SAMPLE_NAME=$1;
         local UNSORTED_BAM="$SAMPLE_NAME.bam"
         local SORTED_BAM="$SAMPLE_NAME.sorted.bam"
+        echo "-- process_alignments";
+        echo "  SAMPLE_NAME: $SAMPLE_NAME";
+        echo "  UNSORTED_BAM: $UNSORTED_BAM";
+        echo "  SORTED_BAM: $SORTED_BAM";
 
         echo "Sorting $BAM to generate $SORTED_BAM";
         sambamba sort \
@@ -145,6 +164,10 @@ function process_alignments() {
 function call_somatic_variants() {
         local NORMAL_BAM=$1;
         local TUMOR_BAM=$2;
+        echo "-- call_somatic_variants";
+        echo "  NORMAL_BAM: $NORMAL_BAM";
+        echo "  TUMOR_BAM: $TUMOR_BAM";
+
         echo "Generating Strelka2 configuration";
         configureStrelkaSomaticWorkflow.py \
                 --normalBam $NORMAL_BAM \
@@ -157,8 +180,8 @@ function call_somatic_variants() {
 }
 
 download_and_index_reference_genome;
-align_fastq_pairs $NORMAL_FASTQ_DIR $NORMAL_SAMPLE_NAME;
-align_fastq_pairs $TUMOR_FASTQ_DIR TUMOR_SAMPLE_NAME;
+align_fastq_pairs $NORMAL_FASTQ_DIR $NORMAL_FASTQ_PREFIX $NORMAL_SAMPLE_NAME;
+align_fastq_pairs $TUMOR_FASTQ_DIR $TUMOR_FASTQ_PREFIX TUMOR_SAMPLE_NAME;
 process_alignments "$NORMAL_SAMPLE_NAME";
 process_alignments "$TUMOR_SAMPLE_NAME";
 call_somatic_variants "$NORMAL_SAMPLE_NAME.final.bam" "$TUMOR_SAMPLE_NAME.final.bam";
