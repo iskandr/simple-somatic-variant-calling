@@ -143,29 +143,36 @@ function process_alignments() {
 
         # sort and index every BAM
         # for any name X.bam, create X.sorted.bam
+        # exclude file names which contain sequence '.sorted.'
         for UNSORTED_BAM in $UNSORTED_BAM_PREFIX*.bam ; do
-            local SORTED_BAM=`echo $UNSORTED_BAM | sed -e 's/\.bam/\.sorted\.bam/g'`
-            if [ -s $SORTED_BAM ]; then
-                echo "Skipping sorting for $UNSORTED_BAM since $SORTED_BAM already exists";
-            else
-                echo "Sorting $UNSORTED_BAM to generate $SORTED_BAM";
-                run "sambamba sort \
-                        --memory-limit $MEMORY_LIMIT \
-                        --show-progress \
-                        --nthreads $NUMBER_PROCESSORS \
-                        --out $SORTED_BAM \
-                        $UNSORTED_BAM";
-            fi
-            local SORTED_BAM_INDEX="$SORTED_BAM.bai"
-            if [ -s $SORTED_BAM_INDEX ]; then
-                echo "Skipping indexing for $SORTED_BAM since $SORTED_BAM_INDEX already exists"
-            else
-                echo "Indexing sorted BAM $SORTED_BAM";
-                run "sambamba index \
-                    --nthreads $NUMBER_PROCESSORS \
-                    --show-progress \
-                    $SORTED_BAM";
-            fi
+            case $UNSORTED_BAM in
+                *.sorted.*)
+                    echo "Skipping $UNSORTED_BAM since it contains '.sorted.'";
+                    continue;;
+                *)
+                    local SORTED_BAM=`echo $UNSORTED_BAM | sed -e 's/\.bam/\.sorted\.bam/g'`
+                    if [ -s $SORTED_BAM ]; then
+                        echo "Skipping sorting for $UNSORTED_BAM since $SORTED_BAM already exists";
+                    else
+                        echo "Sorting $UNSORTED_BAM to generate $SORTED_BAM";
+                        run "sambamba sort \
+                                --memory-limit $MEMORY_LIMIT \
+                                --show-progress \
+                                --nthreads $NUMBER_PROCESSORS \
+                                --out $SORTED_BAM \
+                                $UNSORTED_BAM";
+                    fi
+                    local SORTED_BAM_INDEX="$SORTED_BAM.bai"
+                    if [ -s $SORTED_BAM_INDEX ]; then
+                        echo "Skipping indexing for $SORTED_BAM since $SORTED_BAM_INDEX already exists"
+                    else
+                        echo "Indexing sorted BAM $SORTED_BAM";
+                        run "sambamba index \
+                            --nthreads $NUMBER_PROCESSORS \
+                            --show-progress \
+                            $SORTED_BAM";
+                    fi
+            esac
         done
         local MERGED_BAM="$UNSORTED_BAM_PREFIX.merged.bam"
         if [ -s $MERGED_BAM ]; then
