@@ -107,19 +107,19 @@ function align_fastq_pairs() {
                 local READ_GROUP=`basename $R1_fastq | sed -e 's/\.R1\.fastq\.gz//g'`
                 local BAM="$READ_GROUP.bam"
                 # test if $BAM exists and is non-empty
-                if [ ! -s $BAM ]; then
-                        echo "Generating BAM file $BAM";
-                        local READ_GROUP_TAG="'@RG\tID:$READ_GROUP\tSM:$FASTQ_PREFIX\tLB:$FASTQ_PREFIX\tPL:ILLUMINA'"
-                        run "bwa mem -M \
-                                -t $NUMBER_PROCESSORS \
-                                -R $READ_GROUP_TAG \
-                                $REFERENCE_FASTA_PATH \
-                                $R1_fastq \
-                                $R2_fastq \
-                                | samtools view -S -b -@$NUMBER_PROCESSORS -o $BAM -";
-                        echo "---";
+                if [  -s $BAM ]; then
+                    echo "Skipping alignment of $R1_fastq and $R2_fastq since $BAM already exists"
                 else
-                        echo "BAM file $BAM already exists";
+                    echo "Generating BAM file $BAM";
+                    local READ_GROUP_TAG="'@RG\tID:$READ_GROUP\tSM:$FASTQ_PREFIX\tLB:$FASTQ_PREFIX\tPL:ILLUMINA'"
+                    run "bwa mem -M \
+                            -t $NUMBER_PROCESSORS \
+                            -R $READ_GROUP_TAG \
+                            $REFERENCE_FASTA_PATH \
+                            $R1_fastq \
+                            $R2_fastq \
+                            | samtools view -S -b -@$NUMBER_PROCESSORS -o $BAM -";
+                    echo "---";
                 fi;
         done
 }
@@ -145,39 +145,64 @@ function process_alignments() {
         # for any name X.bam, create X.sorted.bam
         for UNSORTED_BAM in $UNSORTED_BAM_PREFIX*.bam ; do
             local SORTED_BAM=`echo $UNSORTED_BAM | sed -e 's/\.bam/\.sorted\.bam/g'`
-            echo "Sorting $BAM to generate $SORTED_BAM";
-            run "sambamba sort \
-                    --memory-limit $MEMORY_LIMIT \
-                    --show-progress \
+            if [ -s $SORTED_BAM ]; then
+                echo "Skipping sorting for $UNSORTED_BAM since $SORTED_BAM already exists";
+            else
+                echo "Sorting $UNSORTED_BAM to generate $SORTED_BAM";
+                run "sambamba sort \
+                        --memory-limit $MEMORY_LIMIT \
+                        --show-progress \
+                        --nthreads $NUMBER_PROCESSORS \
+                        --out $SORTED_BAM \
+                        $UNSORTED_BAM";
+            fi
+            local SORTED_BAM_INDEX="$SORTED_BAM.bai"
+            if [ -s $SORTED_BAM_INDEX ]; then
+                echo "Skipping indexing for $SORTED_BAM since $SORTED_BAM_INDEX already exists"
+            else
+                echo "Indexing sorted BAM $SORTED_BAM";
+                run "sambamba index \
                     --nthreads $NUMBER_PROCESSORS \
-                    --out $SORTED_BAM \
-                    $UNSORTED_BAM";
-            echo "Indexing sorted BAM $SORTED_BAM";
-            run "sambamba index \
-                --nthreads $NUMBER_PROCESSORS \
-                --show-progress \
-                $SORTED_BAM";
+                    --show-progress \
+                    $SORTED_BAM";
+            fi
         done
-
         local MERGED_BAM="$UNSORTED_BAM_PREFIX.merged.bam"
-        run "sambamba merge \
-            --nthreads $NUMBER_PROCESSORS \
-            --show-progress \
-            $MERGED_BAM \
-            $UNSORTED_BAM_PREFIX*.sorted.bam";
-
-        local FINAL_BAM="$UNSORTED_BAM_PREFIX.final.bam";
-        echo "Marking duplicates to generate $FINAL_BAM";
-        run "sambamba markdup \
+        if [ -s $MERGED_BAM ]; then
+            echo "Skipping merge since $MERGED_BAM already exists"
+        else
+            run "sambamba merge \
                 --nthreads $NUMBER_PROCESSORS \
                 --show-progress \
                 $MERGED_BAM \
-                $FINAL_BAM";
-        run "Indexing final BAM";
-        run "sambamba index \
-                --nthreads $NUMBER_PROCESSORS \
-                --show-progress \
-                $FINAL_BAM";
+                $UNSORTED_BAM_PREFIX*.sorted.bam";
+        fi
+        local FINAL_BAM="$UNSORTED_BAM_PREFIX.final.bam";
+        if [ -s $FINAL_BAM ]; then
+            echo "Skipping markdup since $FINAL_BAM already exists"
+        else
+            echo "Marking duplicates to generate $FINAL_BAM";
+            # for larger WGS, need to have both larger overflow
+            # list and hash table to avoid hitting too many open
+            # files
+            run "sambamba markdup \
+                    --nthreads $NUMBER_PROCESSORS \
+                    --show-progress \
+                    --overflow-list-size 1000000 \
+                    --hash-table-size 4194304 \
+                    $MERGED_BAM \
+                    $FINAL_BAM";
+        fi
+        local FINAL_BAM_INDEX="$FINAL_BAM.bai"
+        if [ -s $FINAL_BAM_INDEX ]; then
+            echo "Skipping indexing on $FINAL_BAM since $FINAL_BAM_INDEX already exists"
+        else
+            echo "Indexing final BAM";
+            run "sambamba index \
+                    --nthreads $NUMBER_PROCESSORS \
+                    --show-progress \
+                    $FINAL_BAM";
+        fi
 }
 
 
