@@ -149,6 +149,12 @@ function process_alignments() {
                 *.sorted.*)
                     echo "Skipping $UNSORTED_BAM since it contains '.sorted.'";
                     continue;;
+                *.merged.*)
+                    echo "Skipping $UNSORTED_BAM since it contains '.merged.'";
+                    continue;;
+                *.final.*)
+                    echo "Skipping $UNSORTED_BAM since it contains '.final.'";
+                    continue;;
                 *)
                     local SORTED_BAM=`echo $UNSORTED_BAM | sed -e 's/\.bam/\.sorted\.bam/g'`
                     if [ -s $SORTED_BAM ]; then
