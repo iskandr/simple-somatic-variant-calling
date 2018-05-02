@@ -236,8 +236,9 @@ function call_somatic_variants() {
                 --runDir .";
         echo "Running Strelka2";
         # execution on a single local machine with 20 parallel jobs
-        run_unless_exists "Calling somatic variants" "results/runStats.tsv" \
+        run_unless_exists "Calling somatic variants" "results/stats/runStats.tsv" \
             "python runWorkflow.py -m local -j $NUMBER_PROCESSORS";
+
         local VCF_PREFIX="$NORMAL_FASTQ_PREFIX.$TUMOR_FASTQ_PREFIX"
         local SNV_VCF="$VCF_PREFIX.snvs.vcf"
         run_unless_exists "Decompressing and renaming SNV VCF" $SNV_VCF \
