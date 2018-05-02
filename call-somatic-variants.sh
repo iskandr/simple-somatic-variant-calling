@@ -79,13 +79,9 @@ function run_unless_exists() {
 
 function download_and_index_reference_genome() {
         echo "-- download_and_index_reference_genome";
-        run_unless_exists \
-            "Download reference from $REFERENCE_FASTA_SOURCE" \
-            $REFERENCE_FASTA_PATH \
+        run_unless_exists "Download reference" $REFERENCE_FASTA_PATH \
             "wget $REFERENCE_FASTA_SOURCE && gunzip hs37d5.fa.gz && mv hs37d5.fa $REFERENCE_FASTA_PATH";
-        run_unless_exists \
-            "Creating index for $REFERENCE_FASTA_PATH" \
-            $REFERENCE_INDEX_PATH \
+        run_unless_exists "Creating index for $REFERENCE_FASTA_PATH" $REFERENCE_INDEX_PATH \
             "bwa index $REFERENCE_FASTA_PATH";
 }
 
@@ -126,9 +122,7 @@ function align_fastq_pairs() {
                 local READ_GROUP=`basename $R1_fastq | sed -e 's/\.R1\.fastq\.gz//g'`
                 local BAM="$READ_GROUP.bam"
                 local READ_GROUP_TAG="'@RG\tID:$READ_GROUP\tSM:$FASTQ_PREFIX\tLB:$FASTQ_PREFIX\tPL:ILLUMINA'"
-                run_unless_exists \
-                    "Alignment of $R1_fastq and $R2_fastq" \
-                    $BAM \
+                run_unless_exists "Align $R1_fastq and $R2_fastq" $BAM \
                     "bwa mem -M \
                             -t $NUMBER_PROCESSORS \
                             -R $READ_GROUP_TAG \
@@ -172,9 +166,7 @@ function process_alignments() {
                     continue;;
                 *)
                     local SORTED_BAM=`echo $UNSORTED_BAM | sed -e 's/\.bam/\.sorted\.bam/g'`
-                    run_unless_exists \
-                        "Sorting $UNSORTED_BAM" \
-                        $SORTED_BAM \
+                    run_unless_exists "Sorting $UNSORTED_BAM" $SORTED_BAM \
                         "sambamba sort \
                                 --memory-limit $MEMORY_LIMIT \
                                 --show-progress \
@@ -183,9 +175,7 @@ function process_alignments() {
                                 $UNSORTED_BAM";
 
                     local SORTED_BAM_INDEX="$SORTED_BAM.bai"
-                    run_unless_exists \
-                        "Indexing sorted BAM $SORTED_BAM" \
-                        $SORTED_BAM_INDEX \
+                    run_unless_exists "Indexing sorted BAM $SORTED_BAM" $SORTED_BAM_INDEX \
                         "sambamba index \
                             --nthreads $NUMBER_PROCESSORS \
                             --show-progress \
@@ -193,9 +183,7 @@ function process_alignments() {
             esac
         done
         local MERGED_BAM="$UNSORTED_BAM_PREFIX.merged.bam"
-        run_unless_exists \
-            "Merging lanes" \
-            $MERGED_BAM \
+        run_unless_exists "Merging lanes" $MERGED_BAM \
             "sambamba merge \
                 --nthreads $NUMBER_PROCESSORS \
                 --show-progress \
@@ -206,9 +194,7 @@ function process_alignments() {
         # for larger WGS, need to have both larger overflow
         # list and hash table to avoid hitting too many open
         # files
-        run_unless_exists \
-            "Marking duplicates" \
-            $FINAL_BAM \
+        run_unless_exists "Marking duplicates" $FINAL_BAM \
             "sambamba markdup \
                     --nthreads $NUMBER_PROCESSORS \
                     --show-progress \
@@ -217,9 +203,7 @@ function process_alignments() {
                     $MERGED_BAM \
                     $FINAL_BAM";
         local FINAL_BAM_INDEX="$FINAL_BAM.bai"
-        run_unless_exists \
-            "Indexing final BAM" \
-            $FINAL_BAM_INDEX \
+        run_unless_exists "Indexing final BAM" $FINAL_BAM_INDEX \
             "sambamba index \
                     --nthreads $NUMBER_PROCESSORS \
                     --show-progress \
@@ -239,15 +223,12 @@ function call_somatic_variants() {
             exit 1;
         fi
         # Strelka2 expects a .fai file associated with the reference
-        run_unless_exists \
-            "Indexing reference FASTA" \
+        run_unless_exists "Indexing reference FASTA" \
             "$REFERENCE_FASTA_PATH.fai" \
             "samtools faidx $REFERENCE_FASTA_PATH";
 
         echo "Generating Strelka2 configuration";
-        run_unless_exists
-            "Configure Strelka2" \
-            "runWorkflow.py" \
+        run_unless_exists "Configure Strelka2" "runWorkflow.py" \
             "configureStrelkaSomaticWorkflow.py \
                 --normalBam $NORMAL_BAM \
                 --tumorBam $TUMOR_BAM \
