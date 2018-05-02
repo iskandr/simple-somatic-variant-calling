@@ -1,5 +1,7 @@
-# simple-dirty-somatic-variant-calling
+# simple-somatic-variant-calling
 A simple genomics "pipeline" implemented via a single shell script. Aligns tumor & normal DNA sequencing data, marks duplicate reads in BAM files, and runs Strelka2 as a somatic variant caller. 
+
+Expected input FASTQ files for normal and tumor DNA sequencing data. The pipeline will generate (in whichever directory it's invoked) a collection of BAM files and ultimately two VCFs: somatic SNVs and somatic indels. 
 
 ## Requirements
 
