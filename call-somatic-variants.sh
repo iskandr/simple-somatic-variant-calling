@@ -252,7 +252,7 @@ function call_somatic_variants() {
                 --runDir .";
         echo "Running Strelka2";
         # execution on a single local machine with 20 parallel jobs
-        run "./runWorkflow.py -m local -j $NUMBER_PROCESSORS";
+        run "python runWorkflow.py -m local -j $NUMBER_PROCESSORS";
 }
 
 download_and_index_reference_genome;
