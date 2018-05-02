@@ -52,22 +52,41 @@ function run() {
         eval "time $COMMAND"
 }
 
+function run_unless_exists() {
+    # Takes 3 arguments:
+    #   1) Description of what work might get executed
+    #   2) File name, which if it exists and is not empty, should prevent
+    #       anything further from being executed.
+    #   3) Command to run.
+
+    if [ $# -ne 3 ] ; then
+        echo "Function 'run_unless_exists' expected 3 arguments but got $#";
+        exit 1;
+    fi
+
+    # run a command unless its output file has already been created
+    local DESCRIPTION=$1;
+    local OUTPUT_FILE=$2;
+    local COMMAND=$3;
+
+    if [ -s $OUTPUT_FILE ]; then
+        echo ">> Skipping '$DESCRIPTION' because $OUTPUT_FILE already exists";
+    else
+        echo ">> Running '$DESCRIPTION' to create $OUTPUT_FILE";
+        run "$COMMAND";
+    fi
+}
+
 function download_and_index_reference_genome() {
         echo "-- download_and_index_reference_genome";
-        if [ ! -e $REFERENCE_FASTA_PATH ]; then
-                echo "Couldn't find reference file $REFERENCE_FASTA_PATH";
-                echo "Downloading from $REFERENCE_FASTA_SOURCE..."
-                run "wget $REFERENCE_FASTA_SOURCE";
-                echo "Decompressing downloaded reference genome..."
-                run "gunzip hs37d5.fa.gz";
-                run "mv hs37d5.fa $REFERENCE_FASTA_PATH";
-        else
-                echo "Using reference: $REFERENCE_FASTA_PATH"
-        fi;
-        if [ ! -s $REFERENCE_INDEX_PATH ]; then
-                echo "Creating index for $REFERENCE_FASTA_PATH"
-                run "bwa index $REFERENCE_FASTA_PATH";
-        fi;
+        run_unless_exists \
+            "Download reference from $REFERENCE_FASTA_SOURCE" \
+            $REFERENCE_FASTA_PATH \
+            "wget $REFERENCE_FASTA_SOURCE && gunzip hs37d5.fa.gz && mv hs37d5.fa $REFERENCE_FASTA_PATH";
+        run_unless_exists \
+            "Creating index for $REFERENCE_FASTA_PATH" \
+            $REFERENCE_INDEX_PATH \
+            "bwa index $REFERENCE_FASTA_PATH";
 }
 
 
@@ -81,7 +100,7 @@ function align_fastq_pairs() {
         echo "  FASTQ_PREFIX=$FASTQ_PREFIX";
 
         if [ $# -ne 2 ] ; then
-            echo "Expected 2 arguments but got $#";
+            echo "Function 'align_fastq_pairs' expected 2 arguments but got $#";
             exit 1;
         fi
 
@@ -106,21 +125,17 @@ function align_fastq_pairs() {
                 # make a local file name for the BAM we're going to generate from each FASTQ pair
                 local READ_GROUP=`basename $R1_fastq | sed -e 's/\.R1\.fastq\.gz//g'`
                 local BAM="$READ_GROUP.bam"
-                # test if $BAM exists and is non-empty
-                if [  -s $BAM ]; then
-                    echo "Skipping alignment of $R1_fastq and $R2_fastq since $BAM already exists"
-                else
-                    echo "Generating BAM file $BAM";
-                    local READ_GROUP_TAG="'@RG\tID:$READ_GROUP\tSM:$FASTQ_PREFIX\tLB:$FASTQ_PREFIX\tPL:ILLUMINA'"
-                    run "bwa mem -M \
+                local READ_GROUP_TAG="'@RG\tID:$READ_GROUP\tSM:$FASTQ_PREFIX\tLB:$FASTQ_PREFIX\tPL:ILLUMINA'"
+                run_unless_exists \
+                    "Alignment of $R1_fastq and $R2_fastq" \
+                    $BAM \
+                    "bwa mem -M \
                             -t $NUMBER_PROCESSORS \
                             -R $READ_GROUP_TAG \
                             $REFERENCE_FASTA_PATH \
                             $R1_fastq \
                             $R2_fastq \
                             | samtools view -S -b -@$NUMBER_PROCESSORS -o $BAM -";
-                    echo "---";
-                fi;
         done
 }
 
@@ -137,7 +152,7 @@ function process_alignments() {
         echo "  UNSORTED_BAM_PREFIX: $UNSORTED_BAM_PREFIX";
 
         if [ $# -ne 1 ] ; then
-            echo "Expected 1 argument but got $#";
+            echo "Function 'process_alignments' expected 1 argument but got $#";
             exit 1;
         fi
 
@@ -157,65 +172,58 @@ function process_alignments() {
                     continue;;
                 *)
                     local SORTED_BAM=`echo $UNSORTED_BAM | sed -e 's/\.bam/\.sorted\.bam/g'`
-                    if [ -s $SORTED_BAM ]; then
-                        echo "Skipping sorting for $UNSORTED_BAM since $SORTED_BAM already exists";
-                    else
-                        echo "Sorting $UNSORTED_BAM to generate $SORTED_BAM";
-                        run "sambamba sort \
+                    run_unless_exists \
+                        "Sorting $UNSORTED_BAM" \
+                        $SORTED_BAM \
+                        "sambamba sort \
                                 --memory-limit $MEMORY_LIMIT \
                                 --show-progress \
                                 --nthreads $NUMBER_PROCESSORS \
                                 --out $SORTED_BAM \
                                 $UNSORTED_BAM";
-                    fi
+
                     local SORTED_BAM_INDEX="$SORTED_BAM.bai"
-                    if [ -s $SORTED_BAM_INDEX ]; then
-                        echo "Skipping indexing for $SORTED_BAM since $SORTED_BAM_INDEX already exists"
-                    else
-                        echo "Indexing sorted BAM $SORTED_BAM";
-                        run "sambamba index \
+                    run_unless_exists \
+                        "Indexing sorted BAM $SORTED_BAM" \
+                        $SORTED_BAM_INDEX \
+                        "sambamba index \
                             --nthreads $NUMBER_PROCESSORS \
                             --show-progress \
                             $SORTED_BAM";
-                    fi
             esac
         done
         local MERGED_BAM="$UNSORTED_BAM_PREFIX.merged.bam"
-        if [ -s $MERGED_BAM ]; then
-            echo "Skipping merge since $MERGED_BAM already exists"
-        else
-            run "sambamba merge \
+        run_unless_exists \
+            "Merging lanes" \
+            $MERGED_BAM \
+            "sambamba merge \
                 --nthreads $NUMBER_PROCESSORS \
                 --show-progress \
                 $MERGED_BAM \
                 $UNSORTED_BAM_PREFIX*.sorted.bam";
-        fi
         local FINAL_BAM="$UNSORTED_BAM_PREFIX.final.bam";
-        if [ -s $FINAL_BAM ]; then
-            echo "Skipping markdup since $FINAL_BAM already exists"
-        else
-            echo "Marking duplicates to generate $FINAL_BAM";
-            # for larger WGS, need to have both larger overflow
-            # list and hash table to avoid hitting too many open
-            # files
-            run "sambamba markdup \
+
+        # for larger WGS, need to have both larger overflow
+        # list and hash table to avoid hitting too many open
+        # files
+        run_unless_exists \
+            "Marking duplicates" \
+            $FINAL_BAM \
+            "sambamba markdup \
                     --nthreads $NUMBER_PROCESSORS \
                     --show-progress \
                     --overflow-list-size 1000000 \
                     --hash-table-size 4194304 \
                     $MERGED_BAM \
                     $FINAL_BAM";
-        fi
         local FINAL_BAM_INDEX="$FINAL_BAM.bai"
-        if [ -s $FINAL_BAM_INDEX ]; then
-            echo "Skipping indexing on $FINAL_BAM since $FINAL_BAM_INDEX already exists"
-        else
-            echo "Indexing final BAM";
-            run "sambamba index \
+        run_unless_exists \
+            "Indexing final BAM" \
+            $FINAL_BAM_INDEX \
+            "sambamba index \
                     --nthreads $NUMBER_PROCESSORS \
                     --show-progress \
                     $FINAL_BAM";
-        fi
 }
 
 
@@ -227,9 +235,14 @@ function call_somatic_variants() {
         echo "  TUMOR_BAM: $TUMOR_BAM";
 
         if [ $# -ne 2 ] ; then
-            echo "Expected 2 argument but got $#";
+            echo "Function 'call_somatic_variants' expected 2 argument but got $#";
             exit 1;
         fi
+        # Strelka2 expects a .fai file associated with the reference
+        run_unless_exists \
+            "Indexing reference FASTA" \
+            "$REFERENCE_FASTA_PATH.fai" \
+            "samtools faidx $REFERENCE_FASTA_PATH";
 
         echo "Generating Strelka2 configuration";
         run "configureStrelkaSomaticWorkflow.py \
