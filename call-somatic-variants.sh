@@ -212,16 +212,16 @@ function process_alignments() {
 
 
 function call_somatic_variants() {
-        local NORMAL_BAM=$1;
-        local TUMOR_BAM=$2;
         echo "-- call_somatic_variants";
-        echo "  NORMAL_BAM: $NORMAL_BAM";
-        echo "  TUMOR_BAM: $TUMOR_BAM";
-
         if [ $# -ne 2 ] ; then
             echo "Function 'call_somatic_variants' expected 2 argument but got $#";
             exit 1;
         fi
+        local NORMAL_FASTQ_PREFIX=$1;
+        local TUMOR_FASTQ_PREFIX=$2;
+        local NORMAL_BAM="$NORMAL_FASTQ_PREFIX.final.bam";
+        local TUMOR_BAM="$TUMOR_FASTQ_PREFIX.final.bam";
+
         # Strelka2 expects a .fai file associated with the reference
         run_unless_exists "Indexing reference FASTA" \
             "$REFERENCE_FASTA_PATH.fai" \
@@ -236,7 +236,18 @@ function call_somatic_variants() {
                 --runDir .";
         echo "Running Strelka2";
         # execution on a single local machine with 20 parallel jobs
-        run "python runWorkflow.py -m local -j $NUMBER_PROCESSORS";
+        run_unless_exists "Calling somatic variants" "results/runStats.tsv" \
+            "python runWorkflow.py -m local -j $NUMBER_PROCESSORS";
+        local VCF_PREFIX="$NORMAL_FASTQ_PREFIX.$TUMOR_FASTQ_PREFIX"
+        local SNV_VCF="$VCF_PREFIX.snvs.vcf"
+        run_unless_exists "Decompressing and renaming SNV VCF" $SNV_VCF \
+            "zcat results/variants/somatic.snvs.vcf.gz > $SNV_VCF";
+        local INDEL_VCF="$VCF_PREFIX.indels.vcf"
+        run_unless_exists "Decompressing and renaming indel VCF" $INDEL_VCF \
+            "zcat results/variants/somatic.indels.vcf.gz > $INDEL_VCF";
+        echo "Summary:";
+        echo "  Number of passing SNVs: `cat $SNV_VCF | grep PASS | wc -l`"
+        echo "  Number of passing indels: `cat $INDEL_VCF | grep PASS | wc -l`"
 }
 
 download_and_index_reference_genome;
@@ -244,4 +255,4 @@ align_fastq_pairs $NORMAL_FASTQ_DIR $NORMAL_FASTQ_PREFIX;
 align_fastq_pairs $TUMOR_FASTQ_DIR $TUMOR_FASTQ_PREFIX;
 process_alignments $NORMAL_FASTQ_PREFIX;
 process_alignments $TUMOR_FASTQ_PREFIX;
-call_somatic_variants "$NORMAL_FASTQ_PREFIX.final.bam" "$TUMOR_FASTQ_PREFIX.final.bam";
+call_somatic_variants $NORMAL_FASTQ_PREFIX $TUMOR_FASTQ_PREFIX;
