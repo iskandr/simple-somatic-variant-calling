@@ -245,7 +245,10 @@ function call_somatic_variants() {
             "samtools faidx $REFERENCE_FASTA_PATH";
 
         echo "Generating Strelka2 configuration";
-        run "configureStrelkaSomaticWorkflow.py \
+        run_unless_exists
+            "Configure Strelka2" \
+            "runWorkflow.py" \
+            "configureStrelkaSomaticWorkflow.py \
                 --normalBam $NORMAL_BAM \
                 --tumorBam $TUMOR_BAM \
                 --referenceFasta $REFERENCE_FASTA_PATH \
