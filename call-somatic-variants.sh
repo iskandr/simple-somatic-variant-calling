@@ -232,15 +232,15 @@ function call_somatic_variants() {
         "samtools faidx $REFERENCE_FASTA_PATH";
 
     local VCF_PREFIX="$NORMAL_FASTQ_PREFIX.$TUMOR_FASTQ_PREFIX"
-    local STREKLA_DIR="Strelka.$VCF_PREFIX"
+    local STRELKA_DIR="Strelka.$VCF_PREFIX"
 
-    run_unless_exists "Generating Strelka2 configuration" "$STREKLA_DIR/runWorkflow.py" \
-        "mkdir -p $STREKLA_DIR \
+    run_unless_exists "Generating Strelka2 configuration" "$STRELKA_DIR/runWorkflow.py" \
+        "mkdir -p $STRELKA_DIR \
          && configureStrelkaSomaticWorkflow.py \
             --normalBam $NORMAL_BAM \
             --tumorBam $TUMOR_BAM \
             --referenceFasta $REFERENCE_FASTA_PATH \
-            --runDir $STREKLA_DIR";
+            --runDir $STRELKA_DIR";
 
     # execution on a single local machine with multiple threads
     run_unless_exists "Calling somatic variants" "$STRELKA_DIR/results/stats/runStats.tsv" \
@@ -256,7 +256,7 @@ function call_somatic_variants() {
         "zcat $STRELKA_DIR/results/variants/somatic.snvs.vcf.gz > $SNV_VCF";
     local INDEL_VCF="$VCF_PREFIX.indels.vcf"
     run_unless_exists "Decompressing and renaming indel VCF" $INDEL_VCF \
-        "zcat $STREKLA_DIR/results/variants/somatic.indels.vcf.gz > $INDEL_VCF";
+        "zcat $STRELKA_DIR/results/variants/somatic.indels.vcf.gz > $INDEL_VCF";
     echo "Summary:";
     echo "  Number of passing SNVs: `cat $SNV_VCF | grep PASS | wc -l`"
     echo "  Number of passing indels: `cat $INDEL_VCF | grep PASS | wc -l`"
