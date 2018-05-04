@@ -232,7 +232,7 @@ function call_somatic_variants() {
         "samtools faidx $REFERENCE_FASTA_PATH";
 
     local VCF_PREFIX="$NORMAL_FASTQ_PREFIX.$TUMOR_FASTQ_PREFIX"
-    local STREKLA_DIR="Strekla.$VCF_PREFIX"
+    local STREKLA_DIR="Strelka.$VCF_PREFIX"
 
     run_unless_exists "Generating Strelka2 configuration" "$STREKLA_DIR/runWorkflow.py" \
         "mkdir -p $STREKLA_DIR \
