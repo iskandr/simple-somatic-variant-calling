@@ -242,13 +242,16 @@ function call_somatic_variants() {
             --referenceFasta $REFERENCE_FASTA_PATH \
             --runDir $STRELKA_DIR";
 
+    # Strelka doesn't want a 'GB' at the end of the memory limit
+    local MEMORY_LIMIT_AS_INTEGER=`echo $MEMORY_LIMIT | sed -s 's/GB//g'`
+
     # execution on a single local machine with multiple threads
     run_unless_exists "Calling somatic variants" "$STRELKA_DIR/results/stats/runStats.tsv" \
         "cd $STRELKA_DIR \
          && python runWorkflow.py \
                 -m local \
                 -j $NUMBER_PROCESSORS \
-                -g $MEMORY_LIMIT \
+                -g $MEMORY_LIMIT_AS_INTEGER \
          && cd .."
 
     local SNV_VCF="$VCF_PREFIX.snvs.vcf"
