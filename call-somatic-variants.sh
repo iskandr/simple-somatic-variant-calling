@@ -3,7 +3,7 @@ set -e
 
 # machine configuration
 NUMBER_PROCESSORS=32
-MEMORY_LIMIT=40GB
+MEMORY_LIMIT=60GB
 
 # remote source for reference genome
 REFERENCE_FASTA_SOURCE_SERVER=ftp://ftp.1000genomes.ebi.ac.uk
@@ -231,24 +231,32 @@ function call_somatic_variants() {
     run_unless_exists "Indexing reference FASTA" "$REFERENCE_FASTA_PATH.fai" \
         "samtools faidx $REFERENCE_FASTA_PATH";
 
-    run_unless_exists "Generating Strelka2 configuration" "runWorkflow.py" \
-        "configureStrelkaSomaticWorkflow.py \
+    local VCF_PREFIX="$NORMAL_FASTQ_PREFIX.$TUMOR_FASTQ_PREFIX"
+    local STREKLA_DIR="Strekla.$VCF_PREFIX"
+
+    run_unless_exists "Generating Strelka2 configuration" "$STREKLA_DIR/runWorkflow.py" \
+        "mkdir -p $STREKLA_DIR \
+         && configureStrelkaSomaticWorkflow.py \
             --normalBam $NORMAL_BAM \
             --tumorBam $TUMOR_BAM \
             --referenceFasta $REFERENCE_FASTA_PATH \
-            --runDir .";
+            --runDir $STREKLA_DIR";
 
-    # execution on a single local machine with 20 parallel jobs
+    # execution on a single local machine with multiple threads
     run_unless_exists "Calling somatic variants" "results/stats/runStats.tsv" \
-        "python runWorkflow.py -m local -j $NUMBER_PROCESSORS";
+        "cd $STRELKA_DIR \
+         && python runWorkflow.py \
+                -m local \
+                -j $NUMBER_PROCESSORS \
+                -g $MEMORY_LIMIT \
+         && cd .."
 
-    local VCF_PREFIX="$NORMAL_FASTQ_PREFIX.$TUMOR_FASTQ_PREFIX"
     local SNV_VCF="$VCF_PREFIX.snvs.vcf"
     run_unless_exists "Decompressing and renaming SNV VCF" $SNV_VCF \
-        "zcat results/variants/somatic.snvs.vcf.gz > $SNV_VCF";
+        "zcat $STRELKA_DIR/results/variants/somatic.snvs.vcf.gz > $SNV_VCF";
     local INDEL_VCF="$VCF_PREFIX.indels.vcf"
     run_unless_exists "Decompressing and renaming indel VCF" $INDEL_VCF \
-        "zcat results/variants/somatic.indels.vcf.gz > $INDEL_VCF";
+        "zcat $STREKLA_DIR/results/variants/somatic.indels.vcf.gz > $INDEL_VCF";
     echo "Summary:";
     echo "  Number of passing SNVs: `cat $SNV_VCF | grep PASS | wc -l`"
     echo "  Number of passing indels: `cat $INDEL_VCF | grep PASS | wc -l`"
