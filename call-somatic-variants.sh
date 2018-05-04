@@ -243,7 +243,7 @@ function call_somatic_variants() {
             --runDir $STREKLA_DIR";
 
     # execution on a single local machine with multiple threads
-    run_unless_exists "Calling somatic variants" "results/stats/runStats.tsv" \
+    run_unless_exists "Calling somatic variants" "$STRELKA_DIR/results/stats/runStats.tsv" \
         "cd $STRELKA_DIR \
          && python runWorkflow.py \
                 -m local \
