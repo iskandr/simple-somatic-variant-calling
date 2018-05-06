@@ -2,18 +2,32 @@
 set -e
 
 # machine configuration
-NUMBER_PROCESSORS=32
-MEMORY_LIMIT=60GB
+if [ -z $NUMBER_PROCESSORS ]; then
+    NUMBER_PROCESSORS=32
+fi
+if [ -z $MEMORY_LIMIT ]; then
+    MEMORY_LIMIT=60GB
+fi
 
 # remote source for reference genome
-REFERENCE_FASTA_SOURCE_SERVER=ftp://ftp.1000genomes.ebi.ac.uk
-REFERENCE_FASTA_SOURCE_DIR=vol1/ftp/technical/reference/phase2_reference_assembly_sequence
-REFERENCE_FASTA_SOURCE_NAME=hs37d5.fa.gz
+if [ -z $REFERENCE_FASTA_SOURCE_SERVER ]; then
+    REFERENCE_FASTA_SOURCE_SERVER=ftp://ftp.1000genomes.ebi.ac.uk
+fi
+if [ -z $REFERENCE_FASTA_SOURCE_DIR ]; then
+    REFERENCE_FASTA_SOURCE_DIR=vol1/ftp/technical/reference/phase2_reference_assembly_sequence
+fi
+if [ -z $ REFERENCE_FASTA_SOURCE_NAME ]; then
+    REFERENCE_FASTA_SOURCE_NAME=hs37d5.fa.gz
+fi
 REFERENCE_FASTA_SOURCE="$REFERENCE_FASTA_SOURCE_SERVER/$REFERENCE_FASTA_SOURCE_DIR/$REFERENCE_FASTA_SOURCE_NAME"
 
 # local reference genome location
-REFERENCE_DIR=.
-REFERENCE_FASTA_NAME="hs37d5.fasta"
+if [ -z $REFERENCE_DIR ]; then
+    REFERENCE_DIR=.
+fi
+if [ -z $REFERENCE_FASTA_NAME ]; then
+    REFERENCE_FASTA_NAME="hs37d5.fasta"
+fi
 REFERENCE_FASTA_PATH="$REFERENCE_DIR/$REFERENCE_FASTA_NAME"
 REFERENCE_INDEX_PATH="$REFERENCE_FASTA_PATH.bwt"
 
@@ -29,7 +43,7 @@ if [ $# -ne 4 ] ; then
     echo "      (4) common prefix in names of all tumor FASTQ files";
     echo "----"
     echo "Example:";
-    echo "      ./call-somatic-variants.sh . normal . tumor";
+    echo "      ./call-somatic-variants.sh . normal . tumor ";
     exit 1;
 else
     NORMAL_FASTQ_DIR=$1;
@@ -38,12 +52,14 @@ else
     TUMOR_FASTQ_PREFIX=$4;
 fi
 
+PROJECT_NAME="$NORMAL_FASTQ_PREFIX.$TUMOR_FASTQ_PREFIX"
+
 echo "Quick & Dirty Somatic Variant Calling Pipeline";
 echo "---";
 echo "Normal FASTQ location: $NORMAL_FASTQ_DIR/$NORMAL_FASTQ_PREFIX*.fastq";
 echo "Tumor FASTQ location: $TUMOR_FASTQ_DIR/$TUMOR_FASTQ_PREFIX*.fastq";
+echo "Project name: $PROJECT_NAME"
 echo "---";
-
 
 function run() {
     # print a command before running it wrapped in a 'time' command
@@ -155,9 +171,10 @@ function process_alignments() {
 
     local UNSORTED_BAM_PREFIX=$1;
 
-    # sort and index every BAM
+    # sort and index every read group's BAM
     # for any name X.bam, create X.sorted.bam
     # exclude file names which contain sequence '.sorted.'
+    # sorted files still get written out to temporary directory
     for UNSORTED_BAM in $UNSORTED_BAM_PREFIX*.bam ; do
         case $UNSORTED_BAM in
             *.sorted.*)
@@ -171,6 +188,7 @@ function process_alignments() {
                 continue;;
             *)
                 local SORTED_BAM=`echo $UNSORTED_BAM | sed -e 's/\.bam/\.sorted\.bam/g'`
+
                 run_unless_exists "Sorting $UNSORTED_BAM" $SORTED_BAM \
                     "sambamba sort \
                             --memory-limit $MEMORY_LIMIT \
@@ -231,8 +249,7 @@ function call_somatic_variants() {
     run_unless_exists "Indexing reference FASTA" "$REFERENCE_FASTA_PATH.fai" \
         "samtools faidx $REFERENCE_FASTA_PATH";
 
-    local VCF_PREFIX="$NORMAL_FASTQ_PREFIX.$TUMOR_FASTQ_PREFIX"
-    local STRELKA_DIR="Strelka.$VCF_PREFIX"
+    local STRELKA_DIR="Strelka.$PROJECT_NAME"
 
     run_unless_exists "Generating Strelka2 configuration" "$STRELKA_DIR/runWorkflow.py" \
         "mkdir -p $STRELKA_DIR \
@@ -254,10 +271,10 @@ function call_somatic_variants() {
                 -g $MEMORY_LIMIT_AS_INTEGER \
          && cd .."
 
-    local SNV_VCF="$VCF_PREFIX.snvs.vcf"
+    local SNV_VCF="$PROJECT_NAME.snvs.vcf"
     run_unless_exists "Decompressing and renaming SNV VCF" $SNV_VCF \
         "zcat $STRELKA_DIR/results/variants/somatic.snvs.vcf.gz > $SNV_VCF";
-    local INDEL_VCF="$VCF_PREFIX.indels.vcf"
+    local INDEL_VCF="$PROJECT_NAME.indels.vcf"
     run_unless_exists "Decompressing and renaming indel VCF" $INDEL_VCF \
         "zcat $STRELKA_DIR/results/variants/somatic.indels.vcf.gz > $INDEL_VCF";
     echo "Summary:";
