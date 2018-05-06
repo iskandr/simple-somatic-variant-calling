@@ -8,6 +8,9 @@ fi
 if [ -z $MEMORY_LIMIT ]; then
     MEMORY_LIMIT=60GB
 fi
+if [ -z $TMP_DIR ]; then
+    TMP_DIR="/tmp"
+fi
 
 # remote source for reference genome
 if [ -z $REFERENCE_FASTA_SOURCE_SERVER ]; then
@@ -51,6 +54,7 @@ else
     TUMOR_FASTQ_DIR=$3;
     TUMOR_FASTQ_PREFIX=$4;
 fi
+
 
 PROJECT_NAME="$NORMAL_FASTQ_PREFIX.$TUMOR_FASTQ_PREFIX"
 
@@ -249,8 +253,7 @@ function call_somatic_variants() {
     run_unless_exists "Indexing reference FASTA" "$REFERENCE_FASTA_PATH.fai" \
         "samtools faidx $REFERENCE_FASTA_PATH";
 
-    local STRELKA_DIR="Strelka.$PROJECT_NAME"
-
+    local STRELKA_DIR="$TMP_DIR/Strelka.$PROJECT_NAME"
     run_unless_exists "Generating Strelka2 configuration" "$STRELKA_DIR/runWorkflow.py" \
         "mkdir -p $STRELKA_DIR \
          && configureStrelkaSomaticWorkflow.py \
