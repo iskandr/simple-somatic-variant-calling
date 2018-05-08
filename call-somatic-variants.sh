@@ -265,6 +265,7 @@ function call_somatic_variants() {
     # Strelka doesn't want a 'GB' at the end of the memory limit
     local MEMORY_LIMIT_AS_INTEGER=`echo $MEMORY_LIMIT | sed -s 's/GB//g'`
 
+    CURRENT_DIR=`pwd`
     # execution on a single local machine with multiple threads
     run_unless_exists "Calling somatic variants" "$STRELKA_DIR/results/stats/runStats.tsv" \
         "cd $STRELKA_DIR \
@@ -272,7 +273,7 @@ function call_somatic_variants() {
                 -m local \
                 -j $NUMBER_PROCESSORS \
                 -g $MEMORY_LIMIT_AS_INTEGER \
-         && cd .."
+         && cd $CURRENT_DIR"
 
     local SNV_VCF="$PROJECT_NAME.snvs.vcf"
     run_unless_exists "Decompressing and renaming SNV VCF" $SNV_VCF \
