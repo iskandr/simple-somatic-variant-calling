@@ -137,16 +137,29 @@ function align_fastq_pairs() {
             exit 1;
     fi
 
-    for R1_fastq in $FASTQ_DIR/$FASTQ_PREFIX*.R1.fastq.gz ; do
-            R2_fastq=`echo $R1_fastq | sed -e 's/\.R1\./\.R2\./g'`
+    for R1_fastq in $FASTQ_DIR/$FASTQ_PREFIX*R1*.fastq.gz ; do
+            case $R1_fastq in
+                *.R1.fastq.gz)
+                    local R2_fastq=`echo $R1_fastq | sed -e 's/\.R1\./\.R2\./g'`
+                    # make a local file name for the BAM we're going to generate from each FASTQ pair
+                    local READ_GROUP=`basename $R1_fastq | sed -e 's/\.R1\.fastq\.gz//g'`
+                    ;;
+                *_R1_001.fastq.gz)
+                    local R2_fastq=`echo $R1_fastq | sed -e 's/_R1_001\./_R2_001\./g'`
+                    local READ_GROUP=`basename $R2_fastq | sed -e 's/_R1_001\.fastq\.gz//g'`
+                    ;;
+                *)
+                    echo "Unrecognized format for FASTQ file: $R1_fastq";
+                    exit 1
+                    ;;
+            esac;
             if [ ! -e $R2_fastq ]; then
                 echo "Couldn't find R2 ($R2_fastq) corresponding to $R1_fastq"
                 exit 1;
             fi;
             echo "R1: $R1_fastq";
             echo "R2: $R2_fastq";
-            # make a local file name for the BAM we're going to generate from each FASTQ pair
-            local READ_GROUP=`basename $R1_fastq | sed -e 's/\.R1\.fastq\.gz//g'`
+
             local BAM="$READ_GROUP.bam"
             local READ_GROUP_TAG="'@RG\tID:$READ_GROUP\tSM:$FASTQ_PREFIX\tLB:$FASTQ_PREFIX\tPL:ILLUMINA'"
             run_unless_exists "Align $R1_fastq and $R2_fastq" $BAM \
