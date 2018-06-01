@@ -153,12 +153,14 @@ function align_fastq_pairs() {
                     exit 1
                     ;;
             esac;
+
+            echo "Processing FASTQ pair R1=$R1_fastq R2=$R2_fastq";
+
             if [ ! -e $R2_fastq ]; then
                 echo "Couldn't find R2 ($R2_fastq) corresponding to $R1_fastq"
                 exit 1;
             fi;
-            echo "R1: $R1_fastq";
-            echo "R2: $R2_fastq";
+
 
             local BAM="$READ_GROUP.bam"
             local READ_GROUP_TAG="'@RG\tID:$READ_GROUP\tSM:$FASTQ_PREFIX\tLB:$FASTQ_PREFIX\tPL:ILLUMINA'"
