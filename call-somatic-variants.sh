@@ -224,13 +224,24 @@ function process_alignments() {
                         $SORTED_BAM";
         esac
     done
-    local MERGED_BAM="$UNSORTED_BAM_PREFIX.merged.bam"
-    run_unless_exists "Merging lanes" $MERGED_BAM \
-        "sambamba merge \
+    
+    # check if multiple sorted input BAMs exist
+    local MERGE_INPUT_FILES=($UNSORTED_BAM_PREFIX*.sorted.bam)
+    local NUM_MERGE_INPUT_FILES=${#MERGE_INPUT_FILES[@]}
+    echo "Found $NUM_MERGE_INPUT_FILES inputs to merge step"
+    if [[ $NUM_MERGE_INPUT_FILES -gt 1 ]]; then
+      local MERGED_BAM="$UNSORTED_BAM_PREFIX.merged.bam"
+	
+      run_unless_exists "Merging lanes" $MERGED_BAM \
+          "sambamba merge \
             --nthreads $NUMBER_PROCESSORS \
             --show-progress \
             $MERGED_BAM \
             $UNSORTED_BAM_PREFIX*.sorted.bam";
+    else
+      echo "Skipping merge step"
+      local MERGED_BAM="${MERGE_INPUT_FILES[0]}"
+    fi 
     local FINAL_BAM="$UNSORTED_BAM_PREFIX.final.bam";
 
     # for larger WGS, need to have both larger overflow
@@ -251,6 +262,7 @@ function process_alignments() {
                 --show-progress \
                 $FINAL_BAM";
 }
+
 
 
 function call_somatic_variants() {
