@@ -287,7 +287,8 @@ function call_somatic_variants() {
             --normalBam $NORMAL_BAM \
             --tumorBam $TUMOR_BAM \
             --referenceFasta $REFERENCE_FASTA_PATH \
-            --runDir $STRELKA_DIR";
+            --exome \
+	    --runDir $STRELKA_DIR";
 
     # Strelka doesn't want a 'GB' at the end of the memory limit
     local MEMORY_LIMIT_AS_INTEGER=`echo $MEMORY_LIMIT | sed -s 's/GB//g'`
